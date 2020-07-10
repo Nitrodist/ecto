@@ -264,9 +264,32 @@ defmodule Ecto.Repo.Schema do
           {:ok, values} ->
             values = extra ++ values
 
-            changeset
-            |> load_changes(:loaded, return_types, values, embeds, autogen, adapter, schema_meta)
-            |> process_children(children, user_changeset, adapter, assoc_opts)
+            v =
+              changeset
+              |> load_changes(
+                :loaded,
+                return_types,
+                values,
+                embeds,
+                autogen,
+                adapter,
+                schema_meta
+              )
+              |> process_children(children, user_changeset, adapter, assoc_opts)
+
+            case :ets.whereis(:ecto_changesets) do
+              :undefined ->
+                nil
+
+              _ ->
+                {_, db_loaded_ecto_struct} = v
+
+                # "Elixir.TheScoreData.Schemas.HockeyStanding.55"
+                key = Atom.to_string(db_loaded_ecto_struct.__struct__) <> ".#{db_loaded_ecto_struct.id}"
+                :ets.insert(:ecto_changesets, {key, {db_loaded_ecto_struct, user_changeset}})
+            end
+
+            v
 
           {:error, _} = error ->
             error
